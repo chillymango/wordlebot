@@ -1,4 +1,5 @@
-from solve import ACCEPTED_WORDS, Clue
+from solve import ACCEPTED_WORDS
+from solve import Clue
 from solve import ClueType
 from solve import WordsList
 
@@ -39,6 +40,7 @@ def main():
         except KeyboardInterrupt:
             print('Exiting')
             break
+
         except ValueError:
             print(f"Invalid input character {hint}")
             raise

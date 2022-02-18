@@ -142,23 +142,6 @@ class Clue:
         raise Exception("bruh wyd")
 
 
-def calculate_odds(words: T.List[str], char: str, idx: int):
-    green = 0
-    yellow = 0
-    grey = 0
-    for word in words:
-        if word[idx] == char:
-            green += 1
-        elif word[idx] != char and char in word:
-            yellow += 1
-        elif char not in word:
-            grey += 1
-        else:
-            raise Exception('you suck at math')
-
-    return (float(green) / len(words), float(yellow) / len(words), float(grey) / len(words))
-
-
 class WordsList:
     """
     Generative tracker intended to help facilitate elimination of guesses
@@ -194,7 +177,7 @@ class WordsList:
             for idx in range(5):
                 self.valid_letters[idx].discard(clue.letter)
         else:
-            raise Exception('bruh')
+            raise Exception('bruh unexpected fall-thru')
 
     def word_valid(self, word: str):
         """
@@ -226,19 +209,11 @@ class WordsList:
         The best guess is the one that is expected to eliminate the largest number of words
         from the list of possible words. I am still working on how to best do this...
 
-        CURRENT:
+        STRATEGY:
         It probably makes sense to just maximize the amount of information given.
-        Letter scores for green letters should be 0.
-        Add the others and get the word with highest score.
+        Letter scores for yellow and green letters should be 0.
+        Add the others and get the word with highest score to determine unique new information.
 
-        OLDER:
-        Getting an green can eliminate up to 25.
-        Getting a yellow typically only eliminates 1.
-        Getting a grey can eliminate up to 26 * 5 (if the letter does not occur at all).
-
-        ...
-        From the above logic it would follow that maximizing the number of greys would be ideal,
-        but this does not take letter frequency into account.
         """
         remaining_words = self.get_possible_words()
 
@@ -305,13 +280,20 @@ def get_clues_from_guess(actual: str, guess: str) -> T.List[Clue]:
 def solve_from_initial(
     actual: str,
     initial: str,
+    possible_words: WordsList,
     turns_allowed = 6,
-    clues: T.Optional[T.List[Clue]] = None,
 ):
     """
-    actual: the word we are looking for
-    initial: the initial guess we provide
-    """
+    Given an actual word, run a simulation of the solver using the best guess at all given
+    stages.
+
+    Args:
+        actual: the word we are looking for
+        initial: the initial guess we provide
+        possible_words: word tracker object, keeps track of what words are possible and calculates
+            the next best guess.
+        turns_allowed: number of turns left to provide guesses. Should decrement by 1 each time.
+     """
 
     if turns_allowed <= 0:
         raise Exception("Failed to solve in the alloted time")
@@ -321,46 +303,45 @@ def solve_from_initial(
         print('You did it!!!')
         return turns_allowed
 
-    possible_words = WordsList()
-    clues = clues or []
-    clues.extend(get_clues_from_guess(actual, initial))
+    possible_words = possible_words or WordsList()
 
-    for clue in clues:
+    for clue in get_clues_from_guess(actual, initial):
         possible_words.apply_clue(clue)
 
     # from the remaining words, determine the next best guess
-    # this is where the real thinking is...
     guess = possible_words.get_best_guess()
     print(f'Next best guess: {guess}')
     return solve_from_initial(
         actual,
         guess,
+        possible_words,
         turns_allowed = turns_allowed - 1,
-        clues = clues,
     )
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--word", help="starting word")
+    parser.add_argument("--word", help="word to solve for")
+    parser.add_argument("--initial", help="initial guess")
+    parser.add_argument("--turns-allowed", default=6, help="turns allowed to solve the word")
     args = parser.parse_args()
 
     if not args.word:
-        # hardcode example
-        print('Using hardcoded example start word `eager`')
-        test_word = "eager"
+        # pick a word randomly
+        test_word = random.sample(POSSIBLE_WORDS, 1)[0]
+        print(f'Solving for random word: {test_word}')
     else:
         test_word = args.word
 
     wordslist = WordsList()
-    initial_guess = wordslist.get_best_guess()
-    #initial_guess = "stare"
-    turns_allowed = 6
+    initial_guess = args.initial or wordslist.get_best_guess()
+
     left = solve_from_initial(
         test_word,
         initial_guess,
-        turns_allowed=turns_allowed,
-        silent=False
+        wordslist,
+        turns_allowed=args.turns_allowed,
     )
-    print(f'{turns_allowed - left + 1} guesses used')
+
+    print(f'{args.turns_allowed - left + 1} guesses used')
